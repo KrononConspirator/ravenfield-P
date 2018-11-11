@@ -1,0 +1,136 @@
+using UnityEngine;
+using System.Collections;
+
+public class ProjectileBlack : MonoBehaviour
+{
+    public CConfiguration cconfiguration;
+
+    public bool autoAssignArmorDamage = true;
+    Vehicle.ArmorRating armorDamage = Vehicle.ArmorRating.AntiTank;
+    protected Vector3 velocity = Vector3.zero;
+    protected float travelDistance = 0f;
+    int hitMask;
+    protected bool travelling = true;
+    public Renderer[] renderers;
+    public ParticleSystem ParticlesBlast;
+
+    Vector3 normscale;
+    public static float GravityRadius = 1f;
+    public static float timeUp = 0.5f;
+    [Header("Expand")]
+    public Vector3 minscale;
+    public Vector3 maxscale;
+    public float speed12 = 2f;
+    public float speed1 = 7f;
+    public float duration12 = 5f;
+    public float duration1 = 2f;
+    [Header("Gravity")]
+    public float GravityPull = 2000f;
+
+    protected void Awake()
+    {
+        GravityRadius = GetComponent<SphereCollider>().radius;
+        normscale = transform.localScale;
+    }
+    protected virtual void Start()
+    {
+        this.velocity = this.transform.forward * 90;
+    }
+    protected virtual void Update()
+    {
+        UpdatePosition();
+    }
+    protected virtual void UpdatePosition()
+    {
+        this.travelDistance += 90 * Time.deltaTime;
+        this.velocity += Physics.gravity * 0f * Time.deltaTime;
+        Vector3 delta = this.velocity * Time.deltaTime;
+        Travel(delta);
+    }
+
+    protected virtual void Travel(Vector3 delta)
+    {
+        Vector3 nextPosition = this.transform.position + delta;
+        RaycastHit hitInfo;
+        if (Physics.Linecast(this.transform.position, nextPosition, out hitInfo, 1))
+        {
+            Hit(hitInfo.point, hitInfo.normal);
+        }
+        if (travelling)
+        {
+            this.transform.position += delta;
+            this.transform.rotation = Quaternion.LookRotation(delta);
+        }
+    }
+    protected virtual void Hit(Vector3 point, Vector3 normal)
+    {
+        this.transform.position = point;
+        this.transform.rotation = Quaternion.LookRotation(normal);
+
+        this.travelling = false;
+        StartCoroutine(Sizseup());
+        if (this.enabled = false)
+        {
+            Destroy(this.gameObject, timeUp);
+            StopCoroutine(Sizseup());
+        }
+        WeaponUser.RegisterHit(point);
+    }
+    protected void OnTriggerStay(Collider other)
+    {
+        if (other.attachedRigidbody)
+        {
+            other.attachedRigidbody.drag = 0;
+            float gravityIntensity = Vector3.Distance(transform.position, other.transform.position) / GravityRadius;
+            other.attachedRigidbody.AddForce((transform.position - other.transform.position) * gravityIntensity * other.attachedRigidbody.mass * GravityPull * Time.smoothDeltaTime);
+            Debug.DrawRay(other.transform.position, transform.position - other.transform.position);
+        }
+    }
+    protected  IEnumerator RepeatLerp(Vector3 a, Vector3 b, float time)
+    {
+        float i = 0.0f;
+        float rate = (1.0f / time) * speed12;
+        while (i < 1.0f)
+        {
+            i += Time.deltaTime * rate;
+            transform.localScale = Vector3.Lerp(a, b, i);
+            yield return null;
+        }
+    }
+    protected IEnumerator RepeatLerp1(Vector3 a, Vector3 b, float time)
+    {
+        float i = 0.0f;
+        float rate = (1.0f / time) * speed1;
+        while (i < 1.0f)
+        {
+            i += Time.deltaTime * rate;
+            transform.localScale = Vector3.Lerp(a, b, i);
+            yield return null;
+        }
+    }
+    protected IEnumerator Sizseup()
+    {
+        GravityRadius = 30f;
+        yield return RepeatLerp(normscale, maxscale, duration12);
+        yield return RepeatLerp1(maxscale, minscale, duration1);
+        this.enabled = false;
+        this.ParticlesBlast.Play();
+    }
+    [System.Serializable]
+    public class CConfiguration
+    {
+        public static float impactForce = 20f;
+        public static float lifetime = 2000f;
+        public static float damage = 7000f;
+        public static float balanceDamage = 600f;
+        public static float impactDecalSize = 0.1f;
+        public bool passThroughPenetrateLayer = true;
+        public static bool piercing = false;
+        public static bool makesFlybySound = false;
+        public static float flybyPitch = 1f;
+        public float dropoffEnd = 300f;
+        public AnimationCurve damageDropOff;
+        public static bool inheritVelocity = true;
+    }
+}
+
